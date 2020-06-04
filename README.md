@@ -48,8 +48,9 @@ the [ocp_templates](ocp_templates/) dir.
 
 Assuming docker, though this should work just as well with podman,
 `docker build -t asyncfibber .`, and then `docker run -P asyncfibber`.
-Then you can talk to it over a tcp socket (so telnet, netcat/nc, socat,
-write a program, whatever) to get some fibonacci numbers.
+Find the exposed port with `docker ps`, then you can talk to it over a
+tcp socket (using telnet, netcat/nc, socat, a program you wrote, whatever)
+to get some fibonacci numbers.
 
 The interface is:
   - Send an int, followed by a newline

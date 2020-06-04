@@ -1,3 +1,5 @@
+# From:
+# https://alexbrand.dev/post/how-to-package-rust-applications-into-minimal-docker-containers/ and
 # https://dev.to/deciduously/use-multi-stage-docker-builds-for-statically-linked-rust-binaries-3jgd
 
 # Build Stage
