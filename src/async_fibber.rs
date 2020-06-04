@@ -3,7 +3,7 @@ pub fn fib(n: usize, cache: &mut Vec<u64>) -> Result<u64, String> {
     // using the magic of match to handle the initial conditions,
     // and then recursion to handle the rest.
     if let Some(result) = cache.get(n) {
-        return Ok(*result);
+        Ok(*result)
     } else {
         // cache miss, recurses back until the first cache hit,
         // then populates and returns from the cache up the stack
@@ -13,7 +13,7 @@ pub fn fib(n: usize, cache: &mut Vec<u64>) -> Result<u64, String> {
         if overflow {
             Err(format!("Overflow at fibonacci index {}", n))
         } else {
-            &cache.push(result);
+            cache.push(result);
             fib(n, cache)
         }
     }
@@ -52,6 +52,7 @@ mod tests {
         assert_eq!(cache.len(), 11);
     }
     #[test]
+    #[allow(clippy::unreadable_literal)]
     /// ensure sane value and cache at n: 93, max n value before overflow
     fn fib93() {
         let mut cache = fib_cache();

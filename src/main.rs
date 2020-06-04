@@ -24,33 +24,40 @@ struct ThreadPhone<T> {
 // what the actual type of the nested SyncSender is after resolving the
 // generic types. All this does is take the input buffer from the stream
 // and convert it to a Result.
-fn process_buffer(inner_tx: mpsc::SyncSender<ThreadPhone<Result<u64, String>>>, buffer: Vec<u8>) -> Result<String, String> {
+fn process_buffer(
+    inner_tx: mpsc::SyncSender<ThreadPhone<Result<u64, String>>>,
+    buffer: Vec<u8>,
+) -> Result<String, String> {
     // let the match nesting begin!
     match str::from_utf8(&buffer) {
         Ok(input) => {
             let received = input.lines().next().unwrap();
             match received.parse::<usize>() {
                 Ok(n) => {
-                    let (t_tx, t_rx) = mpsc::sync_channel(10);
-                    inner_tx.send(ThreadPhone { tx: t_tx, n: n }).unwrap();
+                    let (tx, rx) = mpsc::sync_channel(10);
+                    inner_tx.send(ThreadPhone { tx, n }).unwrap();
                     // the actual fibber answer, formatted to match the "interface"
-                    match t_rx.recv().unwrap() {
-                        Ok(n) => Ok(format!("{}", n)),
-                        Err(e) => Err(format!("{}", e))
+                    match rx.recv().unwrap() {
+                        Ok(n) => Ok(n.to_string()),
+                        Err(e) => Err(e),
                     }
                 }
-                Err(_) => {
-                    Err(format!("'{}' is not an integer followed by a newline", received))
-                }
+                Err(_) => Err(format!(
+                    "'{}' is not an integer followed by a newline",
+                    received
+                )),
             }
         }
         Err(_) => {
             // Bro, I couldn't even pretend to make a utf8 string out of you sent
-            Err(format!("Bro I can't even read that"))
+            Err(String::from("Bro I can't even read that"))
         }
     }
 }
 
+// eventually should replace the `.read` with a `.read_to_string`, since that's where we're
+// eventually trying to get anyway, but for now the unbounded `.read` works fine.
+#[allow(clippy::unused_io_amount)]
 fn main() {
     let (tx, rx) = mpsc::sync_channel(10);
     let mut cache = async_fibber::fib_cache();
@@ -61,7 +68,7 @@ fn main() {
 
     // hand over the cache and receiver to a single worker thread
     // connections are concurrent, but generating and caching fib values isn't
-    thread::spawn(move|| {
+    thread::spawn(move || {
         for tp in rx.iter() {
             let tp = tp as ThreadPhone<_>;
             tp.tx.send(async_fibber::fib(tp.n, &mut cache)).unwrap();
@@ -86,7 +93,7 @@ fn main() {
         // so everything that doesn't end up generating an Ok/Err response to the
         // socket is just .unwrap'd.
         let inner_tx = tx.clone();
-        thread::spawn(move|| {
+        thread::spawn(move || {
             let mut buffer = vec![0; 16];
             let formatted_response: String;
             stream.set_read_timeout(Some(Duration::new(30, 0))).unwrap();
@@ -99,7 +106,7 @@ fn main() {
                     formatted_response = format!("Err: {}\n", msg);
                 }
             }
-            stream.write(&formatted_response.as_bytes()).unwrap();
+            stream.write_all(&formatted_response.as_bytes()).unwrap();
             // log what happened
             println!("sent {}", formatted_response.trim());
         });
