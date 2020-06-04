@@ -34,12 +34,12 @@ fn process_buffer(
             let received = input.lines().next().unwrap();
             match received.parse::<usize>() {
                 Ok(n) => {
-                    let (t_tx, t_rx) = mpsc::sync_channel(10);
-                    inner_tx.send(ThreadPhone { tx: t_tx, n: n }).unwrap();
+                    let (tx, rx) = mpsc::sync_channel(10);
+                    inner_tx.send(ThreadPhone { tx, n }).unwrap();
                     // the actual fibber answer, formatted to match the "interface"
-                    match t_rx.recv().unwrap() {
-                        Ok(n) => Ok(format!("{}", n)),
-                        Err(e) => Err(format!("{}", e)),
+                    match rx.recv().unwrap() {
+                        Ok(n) => Ok(n.to_string()),
+                        Err(e) => Err(e),
                     }
                 }
                 Err(_) => Err(format!(
@@ -50,11 +50,14 @@ fn process_buffer(
         }
         Err(_) => {
             // Bro, I couldn't even pretend to make a utf8 string out of you sent
-            Err(format!("Bro I can't even read that"))
+            Err(String::from("Bro I can't even read that"))
         }
     }
 }
 
+// eventually should replace the `.read` with a `.read_to_string`, since that's where we're
+// eventually trying to get anyway, but for now the unbounded `.read` works fine.
+#[allow(clippy::unused_io_amount)]
 fn main() {
     let (tx, rx) = mpsc::sync_channel(10);
     let mut cache = async_fibber::fib_cache();
@@ -103,7 +106,7 @@ fn main() {
                     formatted_response = format!("Err: {}\n", msg);
                 }
             }
-            stream.write(&formatted_response.as_bytes()).unwrap();
+            stream.write_all(&formatted_response.as_bytes()).unwrap();
             // log what happened
             println!("sent {}", formatted_response.trim());
         });
