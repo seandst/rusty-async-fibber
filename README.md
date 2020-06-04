@@ -37,6 +37,11 @@ drwxr-xr-x root/root         0 2020-06-04 10:10 sys/
 
 So as far as a "microservice" goes, it's pretty micro.
 
+# OpenShift?
+
+Templates for building and running this thing in openshift can be found in
+the [ocp_templates](ocp_templates/) dir.
+
 # but how?
 
 Assuming docker, though this should work just as well with podman,
