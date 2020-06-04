@@ -1,0 +1,32 @@
+kind: DeploymentConfig
+apiVersion: apps.openshift.io/v1
+metadata:
+  name: rusty-async-fibber
+  namespace: oasis
+spec:
+  strategy:
+    type: Rolling
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - rusty-async-fibber
+        from:
+          kind: ImageStreamTag
+          namespace: oasis
+          name: 'rusty-async-fibber:latest'
+  replicas: 1
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: rusty-async-fibber
+    spec:
+      containers:
+        - name: rusty-async-fibber
+          image: >-
+            image-registry.openshift-image-registry.svc:5000/oasis/rusty-async-fibber
+          imagePullPolicy: Always

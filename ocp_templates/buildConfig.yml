@@ -1,0 +1,19 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: rusty-async-fibber
+  namespace: oasis
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'rusty-async-fibber:latest'
+  strategy:
+    type: Docker
+    dockerStrategy: {}
+  postCommit: {}
+  source:
+    type: Git
+    git:
+      uri: 'https://github.com/seandst/rusty-async-fibber.git'
+      ref: master
