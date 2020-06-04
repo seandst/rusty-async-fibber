@@ -1,3 +1,5 @@
+![Fibbing CI](https://github.com/seandst/rusty-async-fibber/workflows/Fibbing%20CI/badge.svg)
+
 # wat
 
 My first little foray into rust, which is generally useless
