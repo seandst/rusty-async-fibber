@@ -24,7 +24,10 @@ struct ThreadPhone<T> {
 // what the actual type of the nested SyncSender is after resolving the
 // generic types. All this does is take the input buffer from the stream
 // and convert it to a Result.
-fn process_buffer(inner_tx: mpsc::SyncSender<ThreadPhone<Result<u64, String>>>, buffer: Vec<u8>) -> Result<String, String> {
+fn process_buffer(
+    inner_tx: mpsc::SyncSender<ThreadPhone<Result<u64, String>>>,
+    buffer: Vec<u8>,
+) -> Result<String, String> {
     // let the match nesting begin!
     match str::from_utf8(&buffer) {
         Ok(input) => {
@@ -36,12 +39,13 @@ fn process_buffer(inner_tx: mpsc::SyncSender<ThreadPhone<Result<u64, String>>>, 
                     // the actual fibber answer, formatted to match the "interface"
                     match t_rx.recv().unwrap() {
                         Ok(n) => Ok(format!("{}", n)),
-                        Err(e) => Err(format!("{}", e))
+                        Err(e) => Err(format!("{}", e)),
                     }
                 }
-                Err(_) => {
-                    Err(format!("'{}' is not an integer followed by a newline", received))
-                }
+                Err(_) => Err(format!(
+                    "'{}' is not an integer followed by a newline",
+                    received
+                )),
             }
         }
         Err(_) => {
@@ -61,7 +65,7 @@ fn main() {
 
     // hand over the cache and receiver to a single worker thread
     // connections are concurrent, but generating and caching fib values isn't
-    thread::spawn(move|| {
+    thread::spawn(move || {
         for tp in rx.iter() {
             let tp = tp as ThreadPhone<_>;
             tp.tx.send(async_fibber::fib(tp.n, &mut cache)).unwrap();
@@ -86,7 +90,7 @@ fn main() {
         // so everything that doesn't end up generating an Ok/Err response to the
         // socket is just .unwrap'd.
         let inner_tx = tx.clone();
-        thread::spawn(move|| {
+        thread::spawn(move || {
             let mut buffer = vec![0; 16];
             let formatted_response: String;
             stream.set_read_timeout(Some(Duration::new(30, 0))).unwrap();
