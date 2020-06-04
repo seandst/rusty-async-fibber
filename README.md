@@ -13,7 +13,7 @@ port).
 Since I've been working with OpenShift so much recently, I baked it up as
 an openshift "microservice", statically compiled into a container where
 it is the only occupant, and is built as a single layer. The container
-image weighs in at just over 3MB, but of course would be larger depending
+image weighs in at under 2MB, but of course would be larger depending
 on the size of the app baked in. The fibber itself is about 12kB of code,
 so presumably the rest is all of the statically linked stuff that gets
 shoved into the bin by rustc.
