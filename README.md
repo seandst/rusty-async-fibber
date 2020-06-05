@@ -6,7 +6,8 @@ My first little foray into rust, which is generally useless
 and presumably reflects my naivete when it comes to developing in
 rust. The async fibber is an example threaded socket server that
 does fibonacci stuff via TCP on port 1234 (yeah I hardcoded the
-port).
+port) and via HTTP on port 8080 with a janky REST API (POST JSON
+to it to get direction).
 
 # dawkah?
 
@@ -52,13 +53,22 @@ Find the exposed port with `docker ps`, then you can talk to it over a
 tcp socket (using telnet, netcat/nc, socat, a program you wrote, whatever)
 to get some fibonacci numbers.
 
-The interface is:
+The socket interface is:
   - Send an int, followed by a newline
   - Send whatever you want, but don't expect a good answer
 
 You will receive back either:
   - `Ok: <the answer>`
   - `Err: <an error message explaining what happened or berating you>`
+
+The http interface is:
+  - Send JSON, looking like '{"n": <some int>}'
+  - Send whatever you want, but don't expect a good answer
+
+You will receive back either:
+  - `{"ok": <the answer>}`
+  - `{"err": <an error message explaining what happened or berating you>}`
+  - An HTTP 400 Bad Request response
 
 I haven't spent any time with docker trying to figure out how to easily
 stop it from the shell. `pkill -9 asyncfibber` works great, though, if

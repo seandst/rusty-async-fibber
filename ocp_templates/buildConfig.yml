@@ -2,7 +2,7 @@ kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
   name: rusty-async-fibber
-  namespace: oasis
+  namespace: yournamespace
 spec:
   output:
     to:

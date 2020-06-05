@@ -1,0 +1,11 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: rusty-async-fibber
+  namespace: yournamespace
+spec:
+  to:
+    kind: Service
+    name: rusty-async-fibber
+  port:
+    targetPort: fibber-http

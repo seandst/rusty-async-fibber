@@ -6,10 +6,11 @@ Yamls for building up the mock "microservice" in OpenShift. The order is:
   references an existing image
 - deploymentConfig.yml
 - service.yml
+- route.yml
 
 Openshift (at least the one I'm using) doesn't let you set up ingress
-for a non-HTTP service (which this is), so access to the fibber is
-only given to cluster members already inside the cluster. So, from
+for a non-HTTP service (which this is), so access to the fibber-socket
+service only given to cluster members already inside the cluster. So, from
 any pod that's got the ability to talk to the service addr:port, you
 can telnet/netcat/socat queries to the fibber service:
 
@@ -21,4 +22,14 @@ sh-4.2$ socat - TCP:172.30.52.253:1234 <<< test
 Err: 'test' is not an integer followed by a newline
 sh-4.2$ dd if=/dev/urandom bs=1024 count=1 status=none | socat - TCP:172.30.52.253:1234
 Err: Bro I can't even read that
+```
+
+To access the fibber-http service, of course, just issue requests to the
+created route:
+
+```
+$ curl -d '{"n": 10}' http://rusty-async-fibber-yournamespace.apps.ocp.example.com/
+{
+  "ok": 55
+}
 ```
