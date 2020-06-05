@@ -1,9 +1,16 @@
+#[macro_use]
+extern crate nickel;
+
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::str;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+
+use nickel::status::StatusCode;
+use nickel::{HttpRouter, JsonBody, Nickel};
+use serde::{Deserialize, Serialize};
 
 mod async_fibber;
 
@@ -20,6 +27,21 @@ struct ThreadPhone<T> {
     n: usize,
 }
 
+#[derive(Deserialize)]
+struct FibNRequest {
+    n: usize,
+}
+
+#[derive(Serialize)]
+struct FibOkResponse {
+    ok: u64,
+}
+
+#[derive(Serialize)]
+struct FibErrResponse {
+    err: String,
+}
+
 // breaking this out into its own function was fun, if only to appreciate
 // what the actual type of the nested SyncSender is after resolving the
 // generic types. All this does is take the input buffer from the stream
@@ -34,7 +56,7 @@ fn process_buffer(
             let received = input.lines().next().unwrap();
             match received.parse::<usize>() {
                 Ok(n) => {
-                    let (tx, rx) = mpsc::sync_channel(10);
+                    let (tx, rx) = mpsc::sync_channel(1);
                     inner_tx.send(ThreadPhone { tx, n }).unwrap();
                     // the actual fibber answer, formatted to match the "interface"
                     match rx.recv().unwrap() {
@@ -59,23 +81,24 @@ fn process_buffer(
 // eventually trying to get anyway, but for now the unbounded `.read` works fine.
 #[allow(clippy::unused_io_amount)]
 fn main() {
+    let mut nickel = Nickel::new();
     let (tx, rx) = mpsc::sync_channel(10);
-    let mut cache = async_fibber::fib_cache();
-    let addr = "0.0.0.0:1234";
+    let nickel_tx = tx.clone();
+    let sock_addr = "0.0.0.0:1234";
     // panic will ensue if the port is in use :D
-    let listener = TcpListener::bind(addr).unwrap();
-    println!("Listening at {}", addr);
+    let listener = TcpListener::bind(sock_addr).unwrap();
+    println!("Socket server listening at {}", sock_addr);
 
     // hand over the cache and receiver to a single worker thread
     // connections are concurrent, but generating and caching fib values isn't
     thread::spawn(move || {
+        let mut cache = async_fibber::fib_cache();
         for tp in rx.iter() {
             let tp = tp as ThreadPhone<_>;
             tp.tx.send(async_fibber::fib(tp.n, &mut cache)).unwrap();
         }
     });
 
-    let mut incoming = listener.incoming();
     // So I'll be honest here. I'm new to this whole "if/while let" thing. I'm pretty sure
     // that what I'm saying is that "while junk coming off of this iterator is not a "None"
     // option, and is not a "Some" option wrapping an "Err" result, expose "stream" in
@@ -86,29 +109,73 @@ fn main() {
     // as this is certainly contained somewhere in the firehose of docs I consumed over
     // the past few days. Could be that when the while let hits an Err then main() panics,
     // which would be bad. I should probably test this in isolation, but probably won't.
-    while let Some(Ok(mut stream)) = incoming.next() {
-        // pass off incoming connections to a thread asap, at which point the mpsc
-        // channel + ThreadPhone is used to pass work up to the worker thread.
-        // Thread panics end up getting printed, which is fine for this example,
-        // so everything that doesn't end up generating an Ok/Err response to the
-        // socket is just .unwrap'd.
-        let inner_tx = tx.clone();
-        thread::spawn(move || {
-            let mut buffer = vec![0; 16];
-            let formatted_response: String;
-            stream.set_read_timeout(Some(Duration::new(30, 0))).unwrap();
-            stream.read(&mut buffer).unwrap();
-            match process_buffer(inner_tx, buffer) {
-                Ok(msg) => {
-                    formatted_response = format!("Ok: {}\n", msg);
+    thread::spawn(move || {
+        let mut incoming = listener.incoming();
+        while let Some(Ok(mut stream)) = incoming.next() {
+            // pass off incoming connections to a thread asap, at which point the mpsc
+            // channel + ThreadPhone is used to pass work up to the worker thread.
+            // Thread panics end up getting printed, which is fine for this example,
+            // so everything that doesn't end up generating an Ok/Err response to the
+            // socket is just .unwrap'd.
+            let inner_tx = tx.clone();
+            thread::spawn(move || {
+                let mut buffer = vec![0; 16];
+                let formatted_response: String;
+                stream.set_read_timeout(Some(Duration::new(30, 0))).unwrap();
+                stream.read(&mut buffer).unwrap();
+                match process_buffer(inner_tx, buffer) {
+                    Ok(msg) => {
+                        formatted_response = format!("Ok: {}\n", msg);
+                    }
+                    Err(msg) => {
+                        formatted_response = format!("Err: {}\n", msg);
+                    }
                 }
-                Err(msg) => {
-                    formatted_response = format!("Err: {}\n", msg);
+                stream.write_all(&formatted_response.as_bytes()).unwrap();
+                // log what happened
+                println!("sent {}", formatted_response.trim());
+            });
+        }
+    });
+
+    // So all that socket stuff up above was some v1 business. Given that
+    // I actually am running all of this in an openshift, it seems reasonable
+    // to expose the service in an OpenShift-friendly, RESTy rusty sort of way.
+    // So we kick all of the socket stuff into threads, and meanwhile...REST
+    // API with nickel I guess? On with the crowbar...ing!
+    nickel.get(
+        "/",
+        middleware!(String::from(
+            "POST some JSON to do fibby stuff, e.g. {{\"n\": <some_int>}}"
+        )),
+    );
+    nickel.post(
+        "/",
+        middleware! {|request, response|
+            match request.json_as::<FibNRequest>() {
+                Ok(fib_request) => {
+                    // yeah, we're still going to send all the work back to the threaded worker though
+                    let (req_tx, req_rx) = mpsc::sync_channel(1);
+                    nickel_tx.send(ThreadPhone { tx: req_tx, n: fib_request.n }).unwrap();
+                    match req_rx.recv().unwrap() {
+                        Ok(ok) => {
+                            let result = FibOkResponse { ok };
+                            (StatusCode::Ok, serde_json::to_string_pretty(&result).unwrap())
+                        }
+                        Err(err) => {
+                            let result = FibErrResponse { err };
+                            (StatusCode::Ok, serde_json::to_string_pretty(&result).unwrap())
+                        }
+                    }
+                }
+                Err(_) => {
+                    // couldn't even parse the JSON
+                    (StatusCode::BadRequest, String::from("Bro that isn't even JSON"))
                 }
             }
-            stream.write_all(&formatted_response.as_bytes()).unwrap();
-            // log what happened
-            println!("sent {}", formatted_response.trim());
-        });
-    }
+        },
+    );
+
+    // time to hardcode another port!
+    nickel.listen("0.0.0.0:8080").unwrap();
 }

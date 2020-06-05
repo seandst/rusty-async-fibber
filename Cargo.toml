@@ -1,6 +1,6 @@
 [package]
 name = "asyncfibber"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Sean Myers <sean.myers@redhat.com>"]
 edition = "2018"
 
@@ -9,3 +9,7 @@ lto = true
 codegen-units = 1
 
 [dependencies]
+# Slightly leery of that leading 0 in the nickel semver, but we'll go with it
+nickel = { version = "^0.11" }
+serde = { version = "^1", features = ["derive"] }
+serde_json = { version = "^1" }
