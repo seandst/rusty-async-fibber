@@ -11,6 +11,7 @@ use std::time::Duration;
 use nickel::status::StatusCode;
 use nickel::{HttpRouter, JsonBody, Nickel};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as AnyJson;
 
 mod async_fibber;
 
@@ -169,8 +170,13 @@ fn main() {
                     }
                 }
                 Err(_) => {
-                    // couldn't even parse the JSON
-                    (StatusCode::BadRequest, String::from("Bro that isn't even JSON"))
+                    match request.json_as::<AnyJson>() {
+                        Ok(_) => {
+                            let result = FibErrResponse { err: "Expects JSON in form '{\"n\": <fibonacci index int to look up>}'".to_string() };
+                            (StatusCode::Ok, serde_json::to_string_pretty(&result).unwrap())
+                        }
+                        Err(_) => (StatusCode::BadRequest, String::from("Bro that isn't even JSON"))
+                    }
                 }
             }
         },
